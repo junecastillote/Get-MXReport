@@ -49,7 +49,6 @@ $recipients = "june.castillote@lazyexchangeadmin.com","admin1@lazyexchangeadmin.
 $subject = "MX Record Report - $now"
 $smtpServer = "smtp.lazyexchangeadmin.com"
 $smtpPort = "25"
-$attachment = $outputCsvFile
 #...................................
 
 #...................................
@@ -182,6 +181,7 @@ $css_string = @'
 '@
 
 $finalResult = @()
+
 foreach ($domain in $domains) {
 	Write-Host "Processing $($domain)... " -NoNewLine
 	$x = "" | Select-Object Name,NameExchange,Preference
@@ -302,5 +302,3 @@ if ($sendEmail -eq $true)
 			Send-MailMessage -SmtpServer $smtpServer -Port $smtpPort -To $recipients -From $senderAddress -Subject $subject -Body $mailBody -BodyAsHTML
 		}	
 	}
-
-	
