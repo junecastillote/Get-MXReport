@@ -6,7 +6,7 @@
 	 Created by:   	Tito D. Castillote Jr.
 					june.castillote@gmail.com
 	 Filename:     	Get-MXReport.ps1
-	 Version:		1.0 (30-July-2018)
+	 Version:		1.1 (20-February-2019)
 	===========================================================================
 
 	.LINK
@@ -25,10 +25,17 @@
 
 #>
 
+<#
+CHANGE LOG:
+
+version 1.1
+- corrected the error on reporting on multiple MX record for one domain.
+	this was due to incorrect placement of variables.
+#>
+
 $scriptVersion = "1.0"
 $now = (Get-Date -Format g) + " " + (Get-TimeZone).ToString().Split(" ")[0]
 $script_root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
-
 
 #set the error flag to false as default
 $errorFlag = $false
@@ -42,7 +49,7 @@ $outputCsvFile = $script_root +"\Reports\MX_Report_$((get-date).tostring("yyyy_M
 #...................................
 # Email Settings
 #...................................
-$sendEmail = $true
+$sendEmail = $false
 $sendCsvAttachment = $true
 $senderAddress = "MX Report <mailer@lazyexchangeadmin.com>"
 $recipients = "june.castillote@lazyexchangeadmin.com","admin1@lazyexchangeadmin.com"
@@ -181,16 +188,17 @@ $css_string = @'
 '@
 
 $finalResult = @()
-
 foreach ($domain in $domains) {
 	Write-Host "Processing $($domain)... " -NoNewLine
-	$x = "" | Select-Object Name,NameExchange,Preference
-	$records = resolve-dnsname -Type MX -Server $dnsServer -Name $domain -ErrorAction SilentlyContinue | Where-Object {$_.QueryType -eq "MX"}
+	
+	$records = resolve-dnsname -Type MX -Name $domain -ErrorAction SilentlyContinue | Where-Object {$_.QueryType -eq "MX"} | Sort-Object -Property Preference
+	#$records
 	
 	#if there are records found
 	if ($records.count -gt 0) {
 		foreach ($record in $records) {
-			$x.Name = $domain
+			$x = "" | Select-Object Name,NameExchange,Preference
+			$x.Name = $record.Name
 			$x.NameExchange = $record.NameExchange
 			$x.Preference = $record.Preference
 			$finalResult += $x
@@ -208,7 +216,7 @@ foreach ($domain in $domains) {
 		Write-Host "NOT OK" -ForegroundColor Red
 	}
 }
-
+$finalResult
 $finalResult | Export-Csv -NoTypeInformation $outputCsvFile
 
 #create the HTML report
