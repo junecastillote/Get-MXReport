@@ -33,7 +33,7 @@ version 1.1
 	this was due to incorrect placement of variables.
 #>
 
-$scriptVersion = "1.0"
+$scriptVersion = "1.1"
 $now = (Get-Date -Format g) + " " + (Get-TimeZone).ToString().Split(" ")[0]
 $script_root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 
@@ -208,6 +208,7 @@ foreach ($domain in $domains) {
 	#if there are no records found or if an error is encountered
 	else {
 		#trip the error flag to $true
+		$x = "" | Select-Object Name,NameExchange,Preference
 		$errorFlag = $true
 		$x.Name = $domain
 		$x.NameExchange = "Error"
@@ -273,6 +274,7 @@ $mailBody += '<p><table id="SectionLabels">'
 $mailBody += '<tr><th>----END of REPORT----</th></tr></table></p>'
 $mailBody += '<p><font size="2" face="Tahoma"><u>Report Settings</u><br /><br />'
 $mailBody += '<b>[EMAIL SETTINGS]</b><br />'
+$mailBody += 'Email Report: ' +  $sendEmail + '<br />'
 $mailBody += 'Sender: ' +  $senderAddress + '<br />'
 $mailBody += 'Recipient: ' +  $recipients + '<br />'
 $mailBody += 'SMTP Server: ' +  $smtpServer + '<br />'
