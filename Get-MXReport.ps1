@@ -6,11 +6,12 @@
 	 Created by:   	Tito D. Castillote Jr.
 					june.castillote@gmail.com
 	 Filename:     	Get-MXReport.ps1
-	 Version:		1.1 (20-February-2019)
+	 Version:		1.2 (21-February-2019)
 	===========================================================================
 
 	.LINK
 		https://www.lazyexchangeadmin.com/2018/08/GetMXReport.html
+		https://github.com/junecastillote/get-mxreport
 
 	.SYNOPSIS
 		Use Get-MXReport.ps1 to query and report the availability of the
@@ -31,9 +32,13 @@ CHANGE LOG:
 version 1.1
 - corrected the error on reporting on multiple MX record for one domain.
 	this was due to incorrect placement of variables.
+
+version 1.2
+- added IP Address in report
+
 #>
 
-$scriptVersion = "1.1"
+$scriptVersion = "1.2"
 $now = (Get-Date -Format g) + " " + (Get-TimeZone).ToString().Split(" ")[0]
 $script_root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 
@@ -197,10 +202,12 @@ foreach ($domain in $domains) {
 	#if there are records found
 	if ($records.count -gt 0) {
 		foreach ($record in $records) {
-			$x = "" | Select-Object Name,NameExchange,Preference
+		
+			$x = "" | Select-Object Name,NameExchange,Preference,IPAddresses
 			$x.Name = $record.Name
 			$x.NameExchange = $record.NameExchange
 			$x.Preference = $record.Preference
+			$x.IPAddresses = ((resolve-dnsname $x.NameExchange -ErrorAction SilentlyContinue).IPAddress | Where-Object {$_ -notmatch ":"}) -join ";"
 			$finalResult += $x
 		}
 		Write-Host "OK" -ForegroundColor Green
@@ -208,11 +215,12 @@ foreach ($domain in $domains) {
 	#if there are no records found or if an error is encountered
 	else {
 		#trip the error flag to $true
-		$x = "" | Select-Object Name,NameExchange,Preference
+		$x = "" | Select-Object Name,NameExchange,Preference,IPAddresses
 		$errorFlag = $true
 		$x.Name = $domain
 		$x.NameExchange = "Error"
 		$x.Preference = "Error"
+		$x.IPAddresses = "Error"
 		$finalResult += $x
 		Write-Host "NOT OK" -ForegroundColor Red
 	}
@@ -234,7 +242,7 @@ $mailBody += '<table id="data">'
 foreach ($result in $finalResult){
 	if ($currentDomain -ne $result.Name)
 	{
-		$mailBody += "<tr><th>$($result.Name)</th><th>MX</th><th>Preference</th><th>Status</th></tr>"
+		$mailBody += "<tr><th>$($result.Name)</th><th>MX</th><th>Preference</th><th>IP Addresses</th><th>Status</th></tr>"
 		$currentDomain = $result.Name
 		#$mailBody += "<tr><td>$($result.Name)</td>"
 		$mailBody += "<tr><td></td>"
@@ -242,13 +250,15 @@ foreach ($result in $finalResult){
 		if ($result.NameExchange -eq "Error")
 		{
 			$mailBody += "<td class = ""bad"">Error</td>"
-			$mailBody += "<td></td>"
+			$mailBody += "<td></td><td></td>"
 			$mailBody += "<td class = ""bad"">Error resolving MX, click here to <a href=https://intodns.com/$($result.Name) target=""_blank"">Analyze</a></td></tr>"
 		}
 		else
 		{
 			$mailBody += "<td>$($result.NameExchange)</td>"
 			$mailBody += "<td>$($result.Preference)</td>"
+			$IPList = ($result.IPAddresses).replace(";",", ")
+			$mailBody += "<td>$(($result.IPAddresses).replace(";","<br>"))</td>"
 			$mailBody += "<td class = ""good"">OK</td></tr>"
 		}
 	}
@@ -265,6 +275,8 @@ foreach ($result in $finalResult){
 		{
 			$mailBody += "<td>$($result.NameExchange)</td>"
 			$mailBody += "<td>$($result.Preference)</td>"
+			$IPList = ($result.IPAddresses).replace(";",", ")
+			$mailBody += "<td>$(($result.IPAddresses).replace(";","<br>"))</td>"
 			$mailBody += "<td class = ""good"">OK</td></tr>"
 		}
 	}
