@@ -6,7 +6,7 @@
 	 Created by:   	Tito D. Castillote Jr.
 					june.castillote@gmail.com
 	 Filename:     	Get-MXReport.ps1
-	 Version:		1.2 (21-February-2019)
+	 Version:		1.3 (21-February-2019)
 	===========================================================================
 
 	.LINK
@@ -36,11 +36,19 @@ version 1.1
 version 1.2
 - added IP Address in report
 
+version 1.3
+- added logic to create the "Reports" folder if not present
+
 #>
 
-$scriptVersion = "1.2"
+$scriptVersion = "1.3"
 $now = (Get-Date -Format g) + " " + (Get-TimeZone).ToString().Split(" ")[0]
 $script_root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+
+if (!(Test-Path "$($script_root)\Reports"))
+{
+	New-Item -ItemType Directory -Path "$($script_root)\Reports"
+}
 
 #set the error flag to false as default
 $errorFlag = $false
@@ -257,7 +265,7 @@ foreach ($result in $finalResult){
 		{
 			$mailBody += "<td>$($result.NameExchange)</td>"
 			$mailBody += "<td>$($result.Preference)</td>"
-			$IPList = ($result.IPAddresses).replace(";",", ")
+			#$IPList = ($result.IPAddresses).replace(";",", ")
 			$mailBody += "<td>$(($result.IPAddresses).replace(";","<br>"))</td>"
 			$mailBody += "<td class = ""good"">OK</td></tr>"
 		}
@@ -275,7 +283,7 @@ foreach ($result in $finalResult){
 		{
 			$mailBody += "<td>$($result.NameExchange)</td>"
 			$mailBody += "<td>$($result.Preference)</td>"
-			$IPList = ($result.IPAddresses).replace(";",", ")
+			#$IPList = ($result.IPAddresses).replace(";",", ")
 			$mailBody += "<td>$(($result.IPAddresses).replace(";","<br>"))</td>"
 			$mailBody += "<td class = ""good"">OK</td></tr>"
 		}
