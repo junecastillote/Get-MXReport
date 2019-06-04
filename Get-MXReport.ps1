@@ -236,6 +236,7 @@ foreach ($domain in $domains) {
 $finalResult
 $finalResult | Export-Csv -NoTypeInformation $outputCsvFile
 
+
 #create the HTML report
 #html title
 $mailBody = "<html><head><title>$($subject)</title><meta http-equiv=""Content-Type"" content=""text/html; charset=ISO-8859-1"" />"
