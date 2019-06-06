@@ -1,98 +1,250 @@
 #Requires -Version 5.1
-<#	
-	.NOTES
-	===========================================================================
-	 Created on:   	30-July-2018
-	 Created by:   	Tito D. Castillote Jr.
-					june.castillote@gmail.com
-	 Filename:     	Get-MXReport.ps1
-	 Version:		1.3 (21-February-2019)
-	===========================================================================
+<#PSScriptInfo
 
-	.LINK
-		https://www.lazyexchangeadmin.com/2018/08/GetMXReport.html
-		https://github.com/junecastillote/get-mxreport
+.VERSION 1.4.1
 
-	.SYNOPSIS
-		Use Get-MXReport.ps1 to query and report the availability of the
-		MX records for your listed domains
+.GUID e9aab4f9-ec6e-4594-a3b9-465d0af991eb
 
-	.DESCRIPTION
-		This will query the Public MX record of your domains, create HTML report which cand
-		also be sent as email.
-		
-	.EXAMPLE
-		.\Get-MXReport.ps1
+.AUTHOR June Castillote
 
-#>
+.COMPANYNAME www.lazyexchanegadmin.com
 
-<#
-CHANGE LOG:
+.COPYRIGHT june.castillote@gmail.com
 
-version 1.1
-- corrected the error on reporting on multiple MX record for one domain.
-	this was due to incorrect placement of variables.
+.TAGS MX DNS Report PowerShell Script Query
 
-version 1.2
-- added IP Address in report
+.LICENSEURI
 
-version 1.3
-- added logic to create the "Reports" folder if not present
+.PROJECTURI https://github.com/junecastillote/Get-MXReport
 
-#>
+.ICONURI
 
-$scriptVersion = "1.3"
-$now = (Get-Date -Format g) + " " + (Get-TimeZone).ToString().Split(" ")[0]
-$script_root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+.EXTERNALMODULEDEPENDENCIES 
 
-if (!(Test-Path "$($script_root)\Reports"))
+.REQUIREDSCRIPTS
+
+.EXTERNALSCRIPTDEPENDENCIES
+
+.RELEASENOTES
+
+
+.PRIVATEDATA
+
+#> 
+
+
+
+
+
+<# 
+
+.DESCRIPTION 
+Query MX record and create reports which can also be sent by email
+
+#> 
+
+
+param (
+	[cmdletbinding()]
+
+	# list of domains to query, accepts array.
+	[Parameter(Mandatory=$true)]
+	[string[]]
+	$domains,
+
+	#path to the output/Report directory (eg. c:\scripts\output)
+	[Parameter(Mandatory=$true)]
+	[string]
+	$outputDirectory,
+
+	# Parameter help description
+	[Parameter()]
+	[string]
+	$nameServer,	
+
+	#path to the log directory (eg. c:\scripts\logs)
+	[Parameter()]
+	[string]
+	$logDirectory,
+
+	#prefix string for the report (ex. COMPANY)
+	[Parameter()]
+	[string]
+	$headerPrefix,
+	
+	#Switch to enable email report
+	[Parameter()]
+    [ValidateSet("ErrorOnly","Always")]
+    [string]
+	$sendEmail,
+
+	#Sender Email Address
+	[Parameter()]
+	[string]
+	$sender,
+
+	#Recipient Email Addresses - separate with comma
+	[Parameter()]
+	[string[]]
+	$recipients,
+
+	#smtpServer
+	[Parameter()]
+	[string]
+	$smtpServer,
+
+	#smtpPort
+	[Parameter()]
+	[string]
+	$smtpPort,
+
+	#switch to indicate whether SMTP server requires authentication
+	[Parameter()]
+	[switch]
+	$smtpServerRequiresAuthentication,
+
+	#credential for SMTP server (if applicable)
+	[Parameter()]
+	[pscredential]
+	$smtpCredential,
+
+	#switch to indicate if SSL will be used for SMTP relay
+	[Parameter()]
+	[switch]
+    $smtpSSL,
+    
+    # switch to attach CSV file
+    [Parameter()]
+    [switch]
+    $attachCSVReport
+)
+
+#...................................
+# Start FUNCTIONS
+#...................................
+Function Stop-TxnLogging
 {
-	New-Item -ItemType Directory -Path "$($script_root)\Reports"
+	$txnLog=""
+	Do {
+		try {
+			Stop-Transcript | Out-Null
+		} 
+		catch [System.InvalidOperationException]{
+			$txnLog="stopped"
+		}
+    } While ($txnLog -ne "stopped")
 }
+
+#Function to Start Transaction Logging
+Function Start-TxnLogging 
+{
+    param 
+    (
+        [Parameter(Mandatory=$true,Position=0)]
+        [string]$logDirectory
+    )
+	Stop-TxnLogging
+    Start-Transcript $logDirectory -Append
+}
+#...................................
+# End FUNCTIONS
+#...................................
+
+Stop-TxnLogging
+Clear-Host
+$scriptInfo = Test-ScriptFileInfo -Path $MyInvocation.MyCommand.Definition
+
+#...................................
+# Start PARAMETER CHECK
+#...................................
+$isAllGood = $true
+
+if ($sendEmail)
+{
+    if (!$sender)
+    {
+        Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": ERROR: A valid sender email address is not specified." -ForegroundColor Yellow
+        $isAllGood = $false
+    }
+
+    if (!$recipients)
+    {
+        Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": ERROR: No recipients specified." -ForegroundColor Yellow
+        $isAllGood = $false
+    }
+
+    if (!$smtpServer )
+    {
+        Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": ERROR: No SMTP Server specified." -ForegroundColor Yellow
+        $isAllGood = $false
+    }
+
+    if (!$smtpPort )
+    {
+        Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": ERROR: No SMTP Port specified." -ForegroundColor Yellow
+        $isAllGood = $false
+	}
+	
+	if ($smtpServerRequiresAuthentication)
+	{
+		if (!$smtpCredential)
+		{
+			Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": ERROR: SMTP Server requires authentication, but no credential was specified. Please specify using the -smtpCredential parameter." -ForegroundColor Yellow
+        	$isAllGood = $false
+		}
+	}
+}
+
+if ($isAllGood -eq $false)
+{
+    Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": ERROR: Exiting Script." -ForegroundColor Yellow
+    EXIT
+}
+#...................................
+# End PARAMETER CHECK
+#...................................
+
+#...................................
+# Start PATHS
+#...................................
+#$today = Get-Date
+#[string]$fileSuffix = '{0:dd-MMM-yyyy_hh-mm_tt}' -f $today
+$logFile = $logDirectory +"\Log_$((get-date).tostring("yyyy_MM_dd")).log"
+$outputCSVFile = $outputDirectory +"\MX_Report_$((get-date).tostring("yyyy_MM_dd")).csv"
+$outputHTMLFile = $outputDirectory +"\MX_Report_$((get-date).tostring("yyyy_MM_dd")).html"
+
+#Create folders if not found
+if ($logDirectory)
+{
+    if (!(Test-Path $logDirectory)) 
+    {
+        New-Item -ItemType Directory -Path $logDirectory | Out-Null
+        #start transcribing----------------------------------------------------------------------------------
+        Start-TxnLogging $logFile
+        #----------------------------------------------------------------------------------------------------
+    }
+	else
+	{
+		Start-TxnLogging $logFile
+	}
+}
+
+if (!(Test-Path $outputDirectory))
+{
+	New-Item -ItemType Directory -Path $outputDirectory | Out-Null
+}
+#...................................
+# End PATHS
+#...................................
+
+#...................................
+# start SCRIPT
+#...................................
+
+$now = (Get-Date -Format ("MMM-dd-yyyy hh:mm tt")) + " " + (Get-TimeZone).ToString().Split(" ")[0]
 
 #set the error flag to false as default
 $errorFlag = $false
-
-#...................................
-# Output Files
-#...................................
-$outputHTMLFile = $script_root +"\Reports\MX_Report_$((get-date).tostring("yyyy_MM_dd")).html"
-$outputCsvFile = $script_root +"\Reports\MX_Report_$((get-date).tostring("yyyy_MM_dd")).csv"
-
-#...................................
-# Email Settings
-#...................................
-$sendEmail = $false
-$sendCsvAttachment = $true
-$senderAddress = "MX Report <mailer@lazyexchangeadmin.com>"
-$recipients = "june.castillote@lazyexchangeadmin.com","admin1@lazyexchangeadmin.com"
-$subject = "MX Record Report - $now"
-$smtpServer = "smtp.lazyexchangeadmin.com"
-$smtpPort = "25"
-#...................................
-
-#...................................
-# DNS Setting
-#...................................
-$dnsServer = "8.8.8.8"
-
-#...................................
-# Office 365 Credentials - ONLY IF YOU USE Exchange Online as SMTP Relay
-#...................................
-#NOTE - replace the $userName and $userPassword
-#$userName = ""
-#$userPassword = ""
-#$secpasswd = ConvertTo-SecureString $userPassword -AsPlainText -Force
-#$onlineCredential = New-Object System.Management.Automation.PSCredential ($userName, $secpasswd)
-#...................................
-
-#...................................
-# Domains
-# Import list from "domains.txt"
-#...................................
-$domains = Get-Content "$($script_root)\domains.txt"
-#...................................
-
 
 $css_string = @'
 <style type="text/css">
@@ -202,134 +354,206 @@ $css_string = @'
 
 $finalResult = @()
 foreach ($domain in $domains) {
-	Write-Host "Processing $($domain)... " -NoNewLine
-	
-	$records = resolve-dnsname -Type MX -Name $domain -ErrorAction SilentlyContinue | Where-Object {$_.QueryType -eq "MX"} | Sort-Object -Property Preference
-	#$records
-	
-	#if there are records found
-	if ($records.count -gt 0) {
-		foreach ($record in $records) {
-		
-			$x = "" | Select-Object Name,NameExchange,Preference,IPAddresses
-			$x.Name = $record.Name
-			$x.NameExchange = $record.NameExchange
-			$x.Preference = $record.Preference
-			$x.IPAddresses = ((resolve-dnsname $x.NameExchange -ErrorAction SilentlyContinue).IPAddress | Where-Object {$_ -notmatch ":"}) -join ";"
-			$finalResult += $x
-		}
-		Write-Host "OK" -ForegroundColor Green
+	$queryParams = @{
+		name = $domain
+		type = "MX"
 	}
-	#if there are no records found or if an error is encountered
-	else {
-		#trip the error flag to $true
-		$x = "" | Select-Object Name,NameExchange,Preference,IPAddresses
-		$errorFlag = $true
-		$x.Name = $domain
-		$x.NameExchange = "Error"
-		$x.Preference = "Error"
-		$x.IPAddresses = "Error"
-		$finalResult += $x
-		Write-Host "NOT OK" -ForegroundColor Red
-	}
-}
-$finalResult
-$finalResult | Export-Csv -NoTypeInformation $outputCsvFile
+	if ($nameServer) {$queryParams += @{Server = $nameServer}}
+    
+    
+    try 
+    {
+        $mxRecords = resolve-dnsname @queryParams -ErrorAction Stop | Where-Object {$_.QueryType -eq "MX"} | Sort-Object -Property Preference
+        #$mxRecords = $allRecords | Where-Object {$_.QueryType -eq "MX"} | Sort-Object -Property Preference
+        if ($mxRecords) {
+            foreach ($mxRecord in $mxRecords) {
+            
+                $x = "" | Select-Object Name,NameExchange,Preference,IPAddresses,Status,Error
+                $x.Name = $domain
+                $x.NameExchange = $mxRecord.NameExchange
+                $x.Preference = $mxRecord.Preference
+                $queryParams = @{
+                    name = $mxRecord.NameExchange
+                }
+                if ($nameServer) {$queryParams += @{Server = $nameServer}}
+    
+                $x.IPAddresses = ((resolve-dnsname @queryParams -ErrorAction SilentlyContinue).IPAddress | Where-Object {$_ -notmatch ":"}) -join ";"
+                $x.Status = "Passed"
+                #$x.Error = ""
+                $finalResult += $x
+            }
+            Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": $($domain): OK" -ForegroundColor Green
+        }
+    }
+    Catch 
+    {
+        $errorFlag = $true
+        $x = "" | Select-Object Name,NameExchange,Preference,IPAddresses,Status,Error
+        $x.Name = $domain
+        $x.NameExchange = "Error"
+        $x.Preference = "Error"
+        $x.IPAddresses = "Error"
+        $x.Status = "Failed"
+        $x.Error = $_.Exception.Message
+        $finalResult += $x
+        Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": $($domain): NOT OK" -ForegroundColor Red
+    }
 
+    
+}
+$finalResult | Export-Csv -NoTypeInformation $outputCsvFile
 
 #create the HTML report
 #html title
-$mailBody = "<html><head><title>$($subject)</title><meta http-equiv=""Content-Type"" content=""text/html; charset=ISO-8859-1"" />"
+if ($headerPrefix)
+{
+    $subject = "[$($headerPrefix)] MX Record Validity Report"
+    #$mailBody = "<html><head><title>$($subject)</title><meta http-equiv=""Content-Type"" content=""text/html; charset=ISO-8859-1"" />"
+}
+else {
+    $subject = "MX Record Validity Report"
+}
+
+$mailBody = "<html><head><title>$($subject) - $($now)</title><meta http-equiv=""Content-Type"" content=""text/html; charset=ISO-8859-1"" />"
 $mailBody += $css_string
 		
 #heading
+$mailBody += "<hr>"	
 $mailBody += '<table id="HeadingInfo">'
-$mailBody += "<tr><th>$($subject)</th></tr>"
+$mailBody += "<tr><th>$($subject)<br />$($now)</th></tr>"
 $mailBody += "</table>"
-$mailBody += '<table id="data">'
+$mailBody += "<hr>"	
 
-foreach ($result in $finalResult){
-	if ($currentDomain -ne $result.Name)
-	{
-		$mailBody += "<tr><th>$($result.Name)</th><th>MX</th><th>Preference</th><th>IP Addresses</th><th>Status</th></tr>"
-		$currentDomain = $result.Name
-		#$mailBody += "<tr><td>$($result.Name)</td>"
-		$mailBody += "<tr><td></td>"
-		
-		if ($result.NameExchange -eq "Error")
-		{
-			$mailBody += "<td class = ""bad"">Error</td>"
-			$mailBody += "<td></td><td></td>"
-			$mailBody += "<td class = ""bad"">Error resolving MX, click here to <a href=https://intodns.com/$($result.Name) target=""_blank"">Analyze</a></td></tr>"
-		}
-		else
-		{
-			$mailBody += "<td>$($result.NameExchange)</td>"
-			$mailBody += "<td>$($result.Preference)</td>"
-			#$IPList = ($result.IPAddresses).replace(";",", ")
-			$mailBody += "<td>$(($result.IPAddresses).replace(";","<br>"))</td>"
-			$mailBody += "<td class = ""good"">OK</td></tr>"
-		}
-	}
-	elseif ($currentDomain -eq $result.Name)
-	{
-		$mailBody += "<tr><td></td>"
-		if ($result.NameExchange -eq "Error")
-		{
-			$mailBody += "<td class = ""bad"">Error</td>"
-			$mailBody += "<td></td>"
-			$mailBody += "<td class = ""bad"">Error resolving MX, click here to <a href=https://intodns.com/$($result.Name) target=""_blank"">Analyze</a></td></tr>"
-		}
-		else
-		{
-			$mailBody += "<td>$($result.NameExchange)</td>"
-			$mailBody += "<td>$($result.Preference)</td>"
-			#$IPList = ($result.IPAddresses).replace(";",", ")
-			$mailBody += "<td>$(($result.IPAddresses).replace(";","<br>"))</td>"
-			$mailBody += "<td class = ""good"">OK</td></tr>"
-		}
-	}
+
+$failedResults = $finalResult | Where-Object {$_.Status -eq "Failed"}
+$passedResults = $finalResult | Where-Object {$_.Status -eq "Passed"} | Group-Object Name
+
+if ($failedResults)
+{
+    $mailBody += '<table id="SectionLabels"><tr><th class="data">Failed MX Lookup</th></tr></table>'
+    $mailBody += '<table id="data">'
+    $mailBody += "<tr><th>Domain</th><th>Error</th></tr>"
+    foreach ($result in $failedResults)
+    {
+        $mailBody += "<tr><td>$($result.Name)</td><td class = ""bad"">$($result.error) <a href=https://intodns.com/$($result.Name) target=""_blank""> > Analyze</a></td></tr>"
+    }
+    $mailBody += '</table>'
 }
-$mailBody += '</table>'
+
+if ($passedResults)
+{
+    $mailBody += '<table id="SectionLabels"><tr><th class="data">Successful MX Lookup</th></tr></table>'
+    
+    $mailBody += '<table id="data">'
+    $mailBody += "<tr><th>Domain</th><th>Mail Exchange | Preference</th></tr>"
+    foreach ($result in $passedResults)
+    {
+        $mx = @()
+        foreach ($item in $result.Group)
+        {
+            $mx += "$($item.NameExchange) | $($item.Preference)"
+        }
+        $mailBody += "<tr><td>$($result.Name)</td><td>" + ($mx -join "<br />")+ "</td></tr>"
+    }
+    $mailBody += '</table>'
+}
+$mailBody += "<hr>"
 $mailBody += '<p><table id="SectionLabels">'
 $mailBody += '<tr><th>----END of REPORT----</th></tr></table></p>'
 $mailBody += '<p><font size="2" face="Tahoma"><u>Report Settings</u><br /><br />'
-$mailBody += '<b>[EMAIL SETTINGS]</b><br />'
-$mailBody += 'Email Report: ' +  $sendEmail + '<br />'
-$mailBody += 'Sender: ' +  $senderAddress + '<br />'
-$mailBody += 'Recipient: ' +  $recipients + '<br />'
-$mailBody += 'SMTP Server: ' +  $smtpServer + '<br />'
-$mailBody += 'Attach CSV: ' +  $sendCsvAttachment + '<br /><br />'
-$mailBody += '<b>[DNS SETTINGS]</b><br />'
-$mailBody += 'DNS Server: ' +  $dnsServer + '<br /><br />'
+
+if ($sendEmail)
+{
+    $mailBody += '<b>[EMAIL SETTINGS]</b><br />'
+    $mailBody += 'Email Report: ' +  $sendEmail + '<br />'
+    $mailBody += 'Sender: ' +  $sender + '<br />'
+    $mailBody += 'Recipients: ' +  ($recipients -join ";") + '<br />'
+    $mailBody += 'SMTP Server: ' +  $smtpServer + '<br />'
+    $mailBody += 'SMTP Port: ' +  $smtpPort + '<br />'
+    $mailBody += 'SMTP SSL: ' +  $smtpSSL + '<br />'
+    $mailBody += 'SMTP Authentication: ' +  $smtpServerRequiresAuthentication + '<br />'
+    $mailBody += 'Attach CSV: ' +  $attachCSVReport + '<br /><br />'
+}
+
+if ($nameServer)
+{
+    $mailBody += '<b>[DNS SETTINGS]</b><br />'
+    $mailBody += 'DNS Server: ' +  $nameServer + '<br /><br />'
+}
+
 $mailBody += '<b>[CONFIGURATION]</b><br />'
 $mailBody += 'Generated from Server: ' + (Get-Content env:computername) + '<br />'
 $mailBody += 'Script File: ' + $MyInvocation.MyCommand.Definition + '<br />'
-$mailBody += 'Report File: ' + $outputCsvFile + '<br /><br />'
+if ($logDirectory)
+{
+    $mailBody += 'Log File: ' + $logFile + '<br />'
+}
+$mailBody += 'CSV Report File: ' + $outputCsvFile + '<br />'
+$mailBody += 'HTML Report File: ' + $outputHTMLFile + '<br /><br />'
+
+
 $mailBody += '</p><p>'
-$mailBody += "<a href=""https://www.lazyexchangeadmin.com/2018/08/GetMXReport.html"">Get-MXReport v.$($scriptVersion)</a></p>"
-$mailBody += '</html>'
+$mailBody += "<a href=""$($scriptInfo.ProjectURI)"">$($MyInvocation.MyCommand.Definition.ToString().Split("\")[-1].Split(".")[0]) $($scriptInfo.version)</a></p>"
+$mailBody += '</body></html>'
 $mailBody | Out-File $outputHTMLFile
 
-Write-host "HTML Report save to $($outputHTMLFile)"
-Write-host "Csv Report save to $($outputCsvFile)"
+Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": HTML Report save to $($outputHTMLFile)" -ForegroundColor Yellow 
+Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": Csv Report save to $($outputCsvFile)" -ForegroundColor Yellow 
 
-if ($sendEmail -eq $true)
+#...................................
+# Start MAIL
+#...................................
+if ($sendEmail)
+{    
+    [string]$mailBody = Get-Content $outputHTMLFile
+    $mailParams = @{
+        From = $sender
+        To = $recipients
+        smtpServer = $smtpServer
+        Port = $smtpPort
+        useSSL = $smtpSSL
+        body = $mailBody
+        bodyashtml = $true
+    }
+
+    if ($errorFlag -eq $true)
 	{
-		Write-Host "Sending email report"
-		[string]$mailBody = Get-Content $outputHTMLFile
-		if ($errorFlag -eq $true)
-		{
-			$subject = "ALERT!!! $($subject)"
-		}
-		#Send-MailMessage -SmtpServer $smtpServer -Port $smtpPort -To $recipients -From $senderAddress -Subject $subject -Body $mailBody -BodyAsHTML -Credential $onlineCredential -UseSSL
-				
-		if ($sendCsvAttachment -eq $true)
-		{
-			Send-MailMessage -SmtpServer $smtpServer -Port $smtpPort -To $recipients -From $senderAddress -Subject $subject -Body $mailBody -BodyAsHTML -Attachments $outputCsvFile
-		}
-		else
-		{
-			Send-MailMessage -SmtpServer $smtpServer -Port $smtpPort -To $recipients -From $senderAddress -Subject $subject -Body $mailBody -BodyAsHTML
-		}	
-	}
+        $subject = "ALERT!!! $($subject)"
+        $mailParams += @{priority = "HIGH"}        
+    }
+    else {
+        $subject = $subject
+        $mailParams += @{priority = "LOW"}
+    }
+
+    $mailParams += @{subject = $subject}
+
+    if ($smtpServerRequiresAuthentication)
+    {
+        $mailParams += @{credential = $smtpCredential}
+    }
+
+    if ($attachCSVReport)
+    {
+        $mailParams += @{Attachments = $outputCSVFile}
+    }
+
+    #Always
+    if ($sendEmail -eq 'Always')
+    {
+        Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": Sending email to" ($recipients -join ", ") -ForegroundColor Yellow
+        Send-MailMessage @mailParams
+    }
+
+    #ErrorOnly AND errorFlag=$true
+    if ($sendEmail -eq 'ErrorOnly' -and $errorFlag -eq $true)
+    {
+        Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": Sending email to" ($recipients -join ", ") -ForegroundColor Yellow
+        Send-MailMessage @mailParams
+    }
+}
+#...................................
+# Start MAIL
+#...................................
+
+Stop-TxnLogging
