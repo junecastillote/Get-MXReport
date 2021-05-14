@@ -19,7 +19,7 @@
 
 .ICONURI
 
-.EXTERNALMODULEDEPENDENCIES 
+.EXTERNALMODULEDEPENDENCIES
 
 .REQUIREDSCRIPTS
 
@@ -30,18 +30,18 @@
 
 .PRIVATEDATA
 
-#> 
+#>
 
 
 
 
 
-<# 
+<#
 
-.DESCRIPTION 
+.DESCRIPTION
 Query MX record and create reports which can also be sent by email
 
-#> 
+#>
 
 
 param (
@@ -60,7 +60,7 @@ param (
 	# Parameter help description
 	[Parameter()]
 	[string]
-	$nameServer,	
+	$nameServer,
 
 	#path to the log directory (eg. c:\scripts\logs)
 	[Parameter()]
@@ -71,7 +71,7 @@ param (
 	[Parameter()]
 	[string]
 	$headerPrefix,
-	
+
 	#Switch to enable email report
 	[Parameter()]
     [ValidateSet("ErrorOnly","Always")]
@@ -112,7 +112,7 @@ param (
 	[Parameter()]
 	[switch]
     $smtpSSL,
-    
+
     # switch to attach CSV file
     [Parameter()]
     [switch]
@@ -128,7 +128,7 @@ Function Stop-TxnLogging
 	Do {
 		try {
 			Stop-Transcript | Out-Null
-		} 
+		}
 		catch [System.InvalidOperationException]{
 			$txnLog="stopped"
 		}
@@ -136,9 +136,9 @@ Function Stop-TxnLogging
 }
 
 #Function to Start Transaction Logging
-Function Start-TxnLogging 
+Function Start-TxnLogging
 {
-    param 
+    param
     (
         [Parameter(Mandatory=$true,Position=0)]
         [string]$logDirectory
@@ -184,7 +184,7 @@ if ($sendEmail)
         Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": ERROR: No SMTP Port specified." -ForegroundColor Yellow
         $isAllGood = $false
 	}
-	
+
 	if ($smtpServerRequiresAuthentication)
 	{
 		if (!$smtpCredential)
@@ -216,7 +216,7 @@ $outputHTMLFile = $outputDirectory +"\MX_Report_$((get-date).tostring("yyyy_MM_d
 #Create folders if not found
 if ($logDirectory)
 {
-    if (!(Test-Path $logDirectory)) 
+    if (!(Test-Path $logDirectory))
     {
         New-Item -ItemType Directory -Path $logDirectory | Out-Null
         #start transcribing----------------------------------------------------------------------------------
@@ -248,19 +248,19 @@ $errorFlag = $false
 
 $css_string = @'
 <style type="text/css">
-#HeadingInfo 
+#HeadingInfo
 	{
 		font-family:"Segoe UI";
 		width:100%;
 		border-collapse:collapse;
-	} 
-#HeadingInfo td, #HeadingInfo th 
+	}
+#HeadingInfo td, #HeadingInfo th
 	{
 		font-size:0.8em;
 		padding:3px 7px 2px 7px;
-	} 
-#HeadingInfo th  
-	{ 
+	}
+#HeadingInfo th
+	{
 		font-size:2.0em;
 		font-weight:normal;
 		text-align:left;
@@ -268,9 +268,9 @@ $css_string = @'
 		padding-bottom:4px;
 		background-color:#604767;
 		color:#fff;
-	} 
+	}
 #SectionLabels
-	{ 
+	{
 		font-family:"Segoe UI";
 		width:100%;
 		border-collapse:collapse;
@@ -282,41 +282,41 @@ $css_string = @'
 		padding-top:5px;
 		padding-bottom:4px;
 		background-color:#fff;
-		color:#000; 
-	} 
-#data 
+		color:#000;
+	}
+#data
 	{
 		font-family:"Segoe UI";
 		width:100%;
 		border-collapse:collapse;
-	} 
+	}
 #data td, #data th
-	{ 
+	{
 		font-size:0.8em;
 		border:1px solid #DDD;
-		padding:3px 7px 2px 7px; 
-	} 
-#data th  
+		padding:3px 7px 2px 7px;
+	}
+#data th
 	{
 		font-size:0.8em;
 		padding-top:5px;
 		padding-bottom:4px;
 		background-color:#00B388;
 		color:#fff; text-align:left;
-	} 
-#data td 
+	}
+#data td
 	{ 	font-size:0.8em;
 		padding-top:5px;
 		padding-bottom:4px;
 		text-align:left;
-	} 
+	}
 #data td.bad
 	{ 	font-size:0.8em;
 		font-weight: bold;
 		padding-top:5px;
 		padding-bottom:4px;
 		color:#f04953;
-	} 
+	}
 #data td.good
 	{ 	font-size:0.8em;
 		font-weight: bold;
@@ -348,8 +348,8 @@ $css_string = @'
 	background: #f04953;
 }
 </style>
-</head> 
-<body> 
+</head>
+<body>
 '@
 
 $finalResult = @()
@@ -359,15 +359,15 @@ foreach ($domain in $domains) {
 		type = "MX"
 	}
 	if ($nameServer) {$queryParams += @{Server = $nameServer}}
-    
-    
-    try 
+
+
+    try
     {
         $mxRecords = resolve-dnsname @queryParams -ErrorAction Stop | Where-Object {$_.QueryType -eq "MX"} | Sort-Object -Property Preference
         #$mxRecords = $allRecords | Where-Object {$_.QueryType -eq "MX"} | Sort-Object -Property Preference
         if ($mxRecords) {
             foreach ($mxRecord in $mxRecords) {
-            
+
                 $x = "" | Select-Object Name,NameExchange,Preference,IPAddresses,Status,Error
                 $x.Name = $domain
                 $x.NameExchange = $mxRecord.NameExchange
@@ -376,7 +376,7 @@ foreach ($domain in $domains) {
                     name = $mxRecord.NameExchange
                 }
                 if ($nameServer) {$queryParams += @{Server = $nameServer}}
-    
+
                 $x.IPAddresses = ((resolve-dnsname @queryParams -ErrorAction SilentlyContinue).IPAddress | Where-Object {$_ -notmatch ":"}) -join ";"
                 $x.Status = "Passed"
                 #$x.Error = ""
@@ -385,7 +385,7 @@ foreach ($domain in $domains) {
             Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": $($domain): OK" -ForegroundColor Green
         }
     }
-    Catch 
+    Catch
     {
         $errorFlag = $true
         $x = "" | Select-Object Name,NameExchange,Preference,IPAddresses,Status,Error
@@ -399,7 +399,7 @@ foreach ($domain in $domains) {
         Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": $($domain): NOT OK" -ForegroundColor Red
     }
 
-    
+
 }
 $finalResult | Export-Csv -NoTypeInformation $outputCsvFile
 
@@ -416,13 +416,13 @@ else {
 
 $mailBody = "<html><head><title>$($subject) - $($now)</title><meta http-equiv=""Content-Type"" content=""text/html; charset=ISO-8859-1"" />"
 $mailBody += $css_string
-		
+
 #heading
-$mailBody += "<hr>"	
+$mailBody += "<hr>"
 $mailBody += '<table id="HeadingInfo">'
 $mailBody += "<tr><th>$($subject)<br />$($now)</th></tr>"
 $mailBody += "</table>"
-$mailBody += "<hr>"	
+$mailBody += "<hr>"
 
 
 $failedResults = $finalResult | Where-Object {$_.Status -eq "Failed"}
@@ -443,7 +443,7 @@ if ($failedResults)
 if ($passedResults)
 {
     $mailBody += '<table id="SectionLabels"><tr><th class="data">Successful MX Lookup</th></tr></table>'
-    
+
     $mailBody += '<table id="data">'
     $mailBody += "<tr><th>Domain</th><th>Mail Exchange | Preference</th></tr>"
     foreach ($result in $passedResults)
@@ -497,14 +497,14 @@ $mailBody += "<a href=""$($scriptInfo.ProjectURI)"">$($MyInvocation.MyCommand.De
 $mailBody += '</body></html>'
 $mailBody | Out-File $outputHTMLFile
 
-Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": HTML Report save to $($outputHTMLFile)" -ForegroundColor Yellow 
-Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": Csv Report save to $($outputCsvFile)" -ForegroundColor Yellow 
+Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": HTML Report save to $($outputHTMLFile)" -ForegroundColor Yellow
+Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": Csv Report save to $($outputCsvFile)" -ForegroundColor Yellow
 
 #...................................
 # Start MAIL
 #...................................
 if ($sendEmail)
-{    
+{
     [string]$mailBody = Get-Content $outputHTMLFile
     $mailParams = @{
         From = $sender
@@ -519,7 +519,7 @@ if ($sendEmail)
     if ($errorFlag -eq $true)
 	{
         $subject = "ALERT!!! $($subject)"
-        $mailParams += @{priority = "HIGH"}        
+        $mailParams += @{priority = "HIGH"}
     }
     else {
         $subject = $subject
