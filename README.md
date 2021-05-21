@@ -1,1 +1,3 @@
-For the complete documentation, please go to https://www.lazyexchangeadmin.com/2018/08/GetMXReport.html
+This project has been discontinued.
+
+For the new version, go to [PsMxRecordReport](https://github.com/junecastillote/PsMxRecordReport).
